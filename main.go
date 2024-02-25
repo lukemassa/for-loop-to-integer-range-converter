@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
+	"io"
 	"log"
 	"math/rand"
 	"os"
@@ -109,26 +111,53 @@ func getValuesForRange(stmt *ast.ForStmt) (string, ast.Expr) {
 	return variable, rangeValue
 }
 
-func fixOneFile(filename string) error {
-	_, err := os.Stat(filename)
-	if err != nil {
-		return err
+func fix(filename string, in io.Reader) (io.Reader, error) {
+	if in == nil {
+		return nil, errors.New("nil reader")
 	}
-	dir := path.Dir(filename)
-
 	fset := token.NewFileSet()
-	node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+	// This won't actually parse the file, since in is non-nil
+	node, err := parser.ParseFile(fset, filename, in, parser.ParseComments)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	replacer := forLoopWithIntReplacer{}
 	gorewrite.Rewrite(&replacer, node)
 
 	// No updates, no need to write file
 	if !replacer.updated {
+		return nil, nil
+
+	}
+	var b bytes.Buffer
+
+	err = format.Node(&b, fset, node)
+	if err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
+func fixOneFile(filename string) error {
+	_, err := os.Stat(filename)
+	if err != nil {
+		return err
+	}
+	dir := path.Dir(filename)
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	res, err := fix(filename, file)
+	if err != nil {
+		return err
+	}
+	// No updates, no need to write file
+	if res == nil {
 		log.Printf("No updates needed for %s", filename)
 		return nil
 	}
+
 	log.Printf("Updating %s", filename)
 
 	outputFile, err := os.CreateTemp(dir, fmt.Sprintf("%s.new.", path.Base(filename)))
@@ -146,17 +175,13 @@ func fixOneFile(filename string) error {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("DELETING")
 		err = os.Remove(outputFileName)
 		if err != nil {
 			panic(err)
 		}
 	}()
+	io.Copy(outputFile, res)
 
-	// Format the modified AST and write it to the file.
-	if err := format.Node(outputFile, fset, node); err != nil {
-		return err
-	}
 	err = os.Rename(outputFileName, filename)
 	if err != nil {
 		return err
