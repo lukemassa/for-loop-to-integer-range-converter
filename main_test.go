@@ -3,9 +3,8 @@ package main
 import (
 	"go/ast"
 	"go/token"
+	"reflect"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 // Handle conversion, see https://stackoverflow.com/questions/12994679/slice-of-struct-slice-of-interface-it-implements
@@ -51,12 +50,8 @@ func TestGetValuesForRange(t *testing.T) {
 		description string
 		stmt        ast.ForStmt
 		expVariable string
-		expRange    string
+		expRange    ast.Expr
 	}{
-		{
-			description: "While loop",
-			stmt:        ast.ForStmt{},
-		},
 		{
 			description: "Correct",
 			stmt: ast.ForStmt{
@@ -65,7 +60,14 @@ func TestGetValuesForRange(t *testing.T) {
 				Post: correctPost,
 			},
 			expVariable: "i",
-			expRange:    "5",
+			expRange: &ast.BasicLit{
+				Value: "5",
+				Kind:  token.INT,
+			},
+		},
+		{
+			description: "While loop",
+			stmt:        ast.ForStmt{},
 		},
 		{
 			description: "Init is not assignment",
@@ -289,37 +291,6 @@ func TestGetValuesForRange(t *testing.T) {
 			},
 		},
 		{
-			description: "Not less than a literal (TODO: Fix)",
-			stmt: ast.ForStmt{
-				Init: correctInit,
-				Cond: &ast.BinaryExpr{
-					X: &ast.Ident{
-						Name: "i",
-					},
-					Y:  ast.NewIdent("j"),
-					Op: token.LSS,
-				},
-				Post: correctPost,
-			},
-		},
-		{
-			description: "Not less than a literal string (TODO: Fix)",
-			stmt: ast.ForStmt{
-				Init: correctInit,
-				Cond: &ast.BinaryExpr{
-					X: &ast.Ident{
-						Name: "i",
-					},
-					Y: &ast.BasicLit{
-						Value: "hello",
-						Kind:  token.STRING,
-					},
-					Op: token.LSS,
-				},
-				Post: correctPost,
-			},
-		},
-		{
 			description: "Post not increment",
 			stmt: ast.ForStmt{
 				Init: correctInit,
@@ -367,8 +338,13 @@ func TestGetValuesForRange(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.description, func(t *testing.T) {
 			actualVariable, actualRange := getValuesForRange(&tc.stmt)
-			assert.Equal(t, tc.expVariable, actualVariable)
-			assert.Equal(t, tc.expRange, actualRange)
+			if tc.expVariable != actualVariable {
+				t.Errorf("Expected variable %v, got %v", tc.expVariable, actualVariable)
+			}
+			if !reflect.DeepEqual(tc.expRange, actualRange) {
+				t.Errorf("Expected range %v, got %v", tc.expRange, actualRange)
+
+			}
 		})
 	}
 

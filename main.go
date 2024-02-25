@@ -26,86 +26,84 @@ func tmpFileName(n int) string {
 	return string(b)
 }
 
-func getValuesForRange(stmt *ast.ForStmt) (string, string) {
+func getValuesForRange(stmt *ast.ForStmt) (string, ast.Expr) {
 	variable := ""
 
 	// Step 1) Is the init correct?
 	assignStmt, ok := stmt.Init.(*ast.AssignStmt)
 	//fmt.Println(assignStmt.Tok)
 	if !ok {
-		return "", ""
+		return "", nil
 	}
 
 	// LHS of statement must be a single variable
 
 	if len(assignStmt.Lhs) != 1 {
-		return "", ""
+		return "", nil
 	}
 
 	variableStmt, ok := assignStmt.Lhs[0].(*ast.Ident)
 	if !ok {
-		return "", ""
+		return "", nil
 	}
 	variable = variableStmt.Name
 
 	// RHS of statement must be ":= 0"
 
 	if assignStmt.Tok != token.DEFINE {
-		return "", ""
+		return "", nil
 	}
 	if len(assignStmt.Rhs) != 1 {
-		return "", ""
+		return "", nil
 	}
 	assignToStmt, ok := assignStmt.Rhs[0].(*ast.BasicLit)
 	if !ok {
-		return "", ""
+		return "", nil
 	}
 	if assignToStmt.Kind != token.INT {
-		return "", ""
+		return "", nil
 	}
 	if assignToStmt.Value != "0" {
-		return "", ""
+		return "", nil
 	}
 
 	// Step 2) Is the condition correct?
 
 	binaryExpr, ok := stmt.Cond.(*ast.BinaryExpr)
 	if !ok {
-		return "", ""
+		return "", nil
 	}
 	if binaryExpr.Op != token.LSS {
-		return "", ""
+		return "", nil
 	}
 	lessThanExpr, ok := binaryExpr.X.(*ast.Ident)
 	if !ok {
-		return "", ""
+		return "", nil
 	}
 	if lessThanExpr.Name != variable {
-		return "", ""
+		return "", nil
 	}
-	rangeExpr, ok := binaryExpr.Y.(*ast.BasicLit)
-	if !ok {
-		return "", ""
-	}
-	if rangeExpr.Kind != token.INT {
-		return "", ""
-	}
-	rangeValue := rangeExpr.Value
+	// Note: we allow any arbitrary expression here, with the assumption
+	// that the incoming code is valid go, hence "i < XXX" where we already
+	// asserted that i is an integer, means that XXX will be an integer.
+	// For example this could be a function call like len(), which would be
+	// hard to detect the type of at the AST stage
+	rangeValue := binaryExpr.Y
 
 	// Step 3) Is post correct?
 	incExp, ok := stmt.Post.(*ast.IncDecStmt)
 	if !ok {
-		return "", ""
+		return "", nil
 	}
 	if incExp.Tok != token.INC {
-		return "", ""
+		return "", nil
 	}
 	variableIncremented, ok := incExp.X.(*ast.Ident)
 	if !ok {
-		return "", ""
+		return "", nil
 	}
 	if variableIncremented.Name != variable {
-		return "", ""
+		return "", nil
 	}
 
 	return variable, rangeValue
@@ -183,8 +181,8 @@ func (v *forLoopWithIntReplacer) Rewrite(n ast.Node) (ast.Node, gorewrite.Rewrit
 	if !ok {
 		return n, v
 	}
-	variable, numToRange := getValuesForRange(forStmt)
-	if variable == "" || numToRange == "" {
+	variable, rangeValue := getValuesForRange(forStmt)
+	if variable == "" || rangeValue == nil {
 		return n, v
 	}
 	v.updated = true
@@ -192,10 +190,8 @@ func (v *forLoopWithIntReplacer) Rewrite(n ast.Node) (ast.Node, gorewrite.Rewrit
 		Key: &ast.Ident{
 			Name: variable,
 		},
-		Tok: token.DEFINE,
-		X: &ast.BasicLit{
-			Value: numToRange,
-		},
+		Tok:  token.DEFINE,
+		X:    rangeValue,
 		Body: forStmt.Body,
 	}, v
 
