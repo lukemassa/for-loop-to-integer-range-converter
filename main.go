@@ -10,23 +10,11 @@ import (
 	"go/token"
 	"io"
 	"log"
-	"math/rand"
 	"os"
 	"path"
 
 	"github.com/tsuna/gorewrite"
 )
-
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-// tmpFileName creates a new file
-func tmpFileName(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
-}
 
 func getValuesForRange(stmt *ast.ForStmt) (string, ast.Expr) {
 	variable := ""
@@ -111,6 +99,10 @@ func getValuesForRange(stmt *ast.ForStmt) (string, ast.Expr) {
 	return variable, rangeValue
 }
 
+func Fix(in io.Reader) (io.Reader, error) {
+	return fix("<file>", in)
+}
+
 func fix(filename string, in io.Reader) (io.Reader, error) {
 	if in == nil {
 		return nil, errors.New("nil reader")
@@ -138,7 +130,7 @@ func fix(filename string, in io.Reader) (io.Reader, error) {
 	return &b, nil
 }
 
-func fixOneFile(filename string) error {
+func FixFile(filename string, dryrun bool) error {
 	_, err := os.Stat(filename)
 	if err != nil {
 		return err
@@ -155,6 +147,10 @@ func fixOneFile(filename string) error {
 	// No updates, no need to write file
 	if res == nil {
 		log.Printf("No updates needed for %s", filename)
+		return nil
+	}
+	if dryrun {
+		log.Printf("Would have updated %s, skipping for dryrun", filename)
 		return nil
 	}
 
@@ -190,7 +186,7 @@ func fixOneFile(filename string) error {
 }
 
 func main() {
-	err := fixOneFile("foo/example.go")
+	err := FixFile("foo/example.go", false)
 	if err != nil {
 		log.Fatal(err)
 	}
