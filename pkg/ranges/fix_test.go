@@ -1,10 +1,13 @@
-package main
+package ranges
 
 import (
 	"go/ast"
 	"go/token"
-	"reflect"
+	"io"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Handle conversion, see https://stackoverflow.com/questions/12994679/slice-of-struct-slice-of-interface-it-implements
@@ -338,14 +341,76 @@ func TestGetValuesForRange(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.description, func(t *testing.T) {
 			actualVariable, actualRange := getValuesForRange(&tc.stmt)
-			if tc.expVariable != actualVariable {
-				t.Errorf("Expected variable %v, got %v", tc.expVariable, actualVariable)
-			}
-			if !reflect.DeepEqual(tc.expRange, actualRange) {
-				t.Errorf("Expected range %v, got %v", tc.expRange, actualRange)
-
-			}
+			assert.Equal(t, tc.expVariable, actualVariable)
+			assert.Equal(t, tc.expRange, actualRange)
 		})
 	}
 
+}
+
+func TestFix(t *testing.T) {
+	cases := []struct {
+		description string
+		input       string
+		expOutput   string
+		expError    string
+	}{
+		{
+			description: "Invalid code",
+			input: `package foo
+
+func Foo() {
+	+++++++
+}
+`,
+			expError: "<file>:4:2: expected statement, found '++' (and 1 more errors)",
+		},
+		{
+			description: "Updateable for loop",
+			input: `package foo
+
+func Foo() {
+	for i := 0; i < 5; i++ {
+		fmt.Println(i)
+	}
+}
+`,
+			expOutput: `package foo
+
+func Foo() {
+	for i := range 5 {
+		fmt.Println(i)
+	}
+}
+`,
+		},
+		{
+			description: "Non updated for loop",
+			input: `package foo
+
+func Foo() {
+	for i := 1; i < 5; i++ {
+		fmt.Println(i)
+	}
+}
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.description, func(t *testing.T) {
+			res, actualErr := Fix(strings.NewReader(tc.input))
+			if tc.expError == "" {
+				assert.NoError(t, actualErr)
+			} else {
+				assert.EqualError(t, actualErr, tc.expError)
+			}
+			if tc.expOutput == "" {
+				assert.Nil(t, res)
+			} else {
+				actualOutput, err := io.ReadAll(res)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expOutput, string(actualOutput))
+			}
+		})
+	}
 }
