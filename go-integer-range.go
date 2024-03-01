@@ -61,7 +61,7 @@ func main() {
 	// Walk through the directory
 	err = filepath.Walk(filePath, walkFunc)
 	if err != nil {
-		log.Fatal(err)
+		os.Exit(1)
 	}
 
 }
