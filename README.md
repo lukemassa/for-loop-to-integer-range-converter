@@ -4,4 +4,9 @@ In golang, converts classic for loops (`for i := 0; i<10; i++`) into integer ran
 
 # Usage
 
-go get -u github.com/lukemassa/go-integer-range
+```
+go install github.com/lukemassa/go-integer-range@v0.1.0
+go-integer-range -h
+```
+
+If `GOBIN` is not in your path, try `~/go/bin/go-integer-range -h`
