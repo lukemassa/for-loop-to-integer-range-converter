@@ -1,4 +1,4 @@
-module github.com/lukemassa/for-loop-to-integer-range-converter
+module github.com/lukemassa/go-integer-range
 
 go 1.22.0
 
