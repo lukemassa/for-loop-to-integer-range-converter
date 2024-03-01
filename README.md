@@ -5,7 +5,7 @@ In golang, converts classic for loops (`for i := 0; i<10; i++`) into integer ran
 # Usage
 
 ```
-go install github.com/lukemassa/go-integer-range@v0.2.0
+go install github.com/lukemassa/go-integer-range@v0.2.2
 go-integer-range -h
 ```
 
