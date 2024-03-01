@@ -22,7 +22,7 @@ func main() {
 
 	_, err := flags.Parse(&opts)
 	if err != nil {
-		log.Fatal(err)
+		os.Exit(1)
 	}
 
 	filePath := opts.Args.Path
@@ -61,7 +61,7 @@ func main() {
 	// Walk through the directory
 	err = filepath.Walk(filePath, walkFunc)
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 }
