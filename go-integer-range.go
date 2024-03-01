@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/lukemassa/go-integer-range/ranges"
+	"github.com/lukemassa/go-integer-range/pkg/ranges"
 )
 
 func main() {
